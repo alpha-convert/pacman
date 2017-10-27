@@ -1,0 +1,8 @@
+package pacman
+
+pkgs = sdl2, contrib
+
+main = main
+executable = main
+
+sourcedir = src
