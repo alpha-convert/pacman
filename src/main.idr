@@ -46,9 +46,9 @@ getEntry m0 k j = index j (getRow m0 k)
 
 {-The board is a sphere-}
 board : SphereMat 20 20 Int
-board = (0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::[]) ::
-        (0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::[]) ::
-        (0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::[]) ::
+board = (1::1::1::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::[]) ::
+        (1::1::1::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::[]) ::
+        (0::0::1::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::[]) ::
         (0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::[]) ::
         (0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::[]) ::
         (0::0::0::0::0::0::0::1::1::1::1::1::1::1::0::0::0::0::0::0::[]) ::
@@ -85,24 +85,24 @@ matToList m0 {n = (S k)} {m = (S j)} = [(x,y,e) |
 isTraversable : SphereMat a b Int -> Nat -> Nat -> Bool
 isTraversable m0 k j = getEntry m0 k j == 1
 
-drawCircle : (x : Int) -> (y : Int) -> (r : Int) -> Int -> Int -> Int -> Renderer -> IO ()
-drawCircle x y rad r g b ren = SDL2.filledEllipse ren x y rad rad r g b 255
+drawCircle : (x : Nat) -> (y : Nat) -> (r : Nat) -> Int -> Int -> Int -> Renderer -> IO ()
+drawCircle x y rad r g b ren = SDL2.filledEllipse ren (cast x) (cast y) (cast rad) (cast rad) r g b 255
 
 drawRect : (x : Int) -> (y : Int) -> (w : Int) -> (h : Int) -> Int -> Int -> Int -> Renderer -> IO ()
 drawRect x y w h r g b ren = SDL2.filledRect ren y x w h r g b 255
 
-drawSquare : (m : Nat) -> (n : Nat) -> (bw : Int) -> (bh : Int) -> (ren : Renderer) -> (Nat, Nat, Int) -> IO ()
+drawSquare : (m : Nat) -> (n : Nat) -> (bw : Nat) -> (bh : Nat) -> (ren : Renderer) -> (Nat, Nat, Int) -> IO ()
 drawSquare m n bw bh ren (x,y,isWall) = let
-  blockX : Int = (cast x) * bw
-  blockY : Int = (cast y) * bh
+  blockX : Nat = x * bw
+  blockY : Nat = y * bh
 in do
-  drawRect blockX blockY bw bh (255*isWall) 0 0 ren
+  drawRect (cast blockX) (cast blockY) (cast bw) (cast bh) (255*isWall) 0 0 ren
 
 
-drawBoard : SphereMat n m Int -> (w : Int) -> (h : Int) -> Renderer -> List (IO ())
+drawBoard : SphereMat n m Int -> (w : Nat) -> (h : Nat) -> Renderer -> List (IO ())
 drawBoard m0 w h {n} {m} = \ren => let
-  widthPerBlock : Int = w `div` (cast m)
-  heightPerBlock : Int = h `div` (cast n)
+  widthPerBlock : Nat = w `div` m
+  heightPerBlock : Nat = h `div` n
 in
   map (drawSquare m n widthPerBlock heightPerBlock ren) (matToList m0)
 
@@ -110,30 +110,52 @@ data Direction = Up | Down | Left | Right
 %name Direction dir,dir0
 
 {- Player x y-}
-data Player = Play Int Int
+data Player = Play Nat Nat
 %name Player p,p'
 
-movePlayer : Direction -> Player -> Player
-movePlayer Up (Play x y) = Play x (y - 1)
-movePlayer Down (Play x y) = Play x (y + 1)
-movePlayer Left (Play x y) = Play (x - 1) y
-movePlayer Right (Play x y) = Play (x + 1) y
+{- State player score -}
+data GameState = State Player Nat
+%name GameState s,s'
 
+execMovePlayer : (w : Nat) -> (h : Nat) -> Direction -> Player -> Player
+execMovePlayer w h Up (Play x Z) = Play x h
+execMovePlayer w h Up (Play x (S k)) = Play x k
+execMovePlayer w h Down (Play x y) = Play x (S y)
+execMovePlayer w h Left (Play Z y) = Play w y
+execMovePlayer w h Left (Play (S k) y) = Play k y
+execMovePlayer w h Right (Play x y) = Play (S x) y
+
+movePlayer : SphereMat w h Int -> Direction -> Player -> Player
+movePlayer m0 Up p@(Play x Z) {w = w} {h = h} = if isTraversable m0 x h
+                                                   then Play x h
+                                                   else p
+movePlayer m0 Up p@(Play x (S k)) {w = w} {h = h} = if isTraversable m0 x k
+                                                     then Play x k
+                                                     else p
+movePlayer m0 Down p@(Play x y) {w = w} {h = h} = if isTraversable m0 x (S y)
+                                                   then Play x (S y)
+                                                   else p
+movePlayer m0 Left p@(Play Z y) {w = w} {h = h} = if isTraversable m0 w y
+                                                   then Play w y
+                                                   else p
+movePlayer m0 Left p@(Play (S k) y) {w = w} {h = h} = if isTraversable m0 (S k) y
+                                                       then Play (S k) y
+                                                       else p
+movePlayer m0 Right p@(Play x y) {w = w} {h = h} = if isTraversable m0 (S x) y
+                                                      then Play (S x) y
+                                                      else p
 
 {-drawCircle : (x : Int) -> (y : Int) -> (r : Int) -> Int -> Int -> Int -> Renderer -> IO ()-}
 
-drawPlayer : Player -> SphereMat n m Int -> (w : Int) -> (h : Int) -> Renderer -> IO ()
-drawPlayer (Play x y) m0 w h ren {n = n} {m = m} = if not (isTraversable m0 (cast x) (cast y))
-                                                      then pure ()
-                                                      else let
-                                                        bw : Int = w `div` (cast m)
-                                                        bh : Int = h `div` (cast n)
-                                                        cx : Int = (x `mod` (cast m))*bw + (bw `div` 2)
-                                                        cy : Int = (y `mod` (cast n))*bh + (bh `div` 2)
-                                                        r : Int = (min bw bh) `div` 3
+drawPlayer : Player -> SphereMat n m Int -> (w : Nat) -> (h : Nat) -> Renderer -> IO ()
+drawPlayer (Play x y) m0 w h ren {n = n} {m = m} = let
+                                                        bw : Nat = w `div` m
+                                                        bh : Nat = h `div` n
+                                                        cx : Nat = (x `mod` m)*bw + (bw `div` 2)
+                                                        cy : Nat = (y `mod` n)*bh + (bh `div` 2)
+                                                        r : Nat = (min bw bh) `div` 2
                                                         in
                                                         drawCircle cx cy r 0 255 0 ren
-
 
 
 fail : (msg: String) -> IO ()
@@ -143,29 +165,57 @@ fail msg = do
   fflush stderr
   System.exit 1
 
-width : Int
+width : Nat
 width = 400
 
-height : Int
+height : Nat
 height = 400
 
 pman : Player
-pman = Play 10 10
+pman = Play 0 0
+
+beginState : GameState
+beginState = State pman 0
+
+updateGhosts : GameState -> GameState
+updateGhosts s = s
+
+mapPlayer : (Player -> Player) -> GameState -> GameState
+mapPlayer f (State p x) = (State (f p) x)
 
 main : IO ()
 main = (do
-  renderer <- SDL2.init width height
-  loop renderer
+  renderer <- SDL2.init (cast width) (cast height)
+  loop beginState renderer
   SDL2.destroyRenderer renderer
   quit)
     where
-      loop : Renderer -> IO ()
-      loop renderer = do
+      loop : GameState -> Renderer -> IO ()
+      loop s@(State player score) renderer = do
+        {- Drawing -}
         False <- SDL2.pollEventsForQuit | pure ()
         True <- SDL2.setRendererDrawColor renderer 0 0 111 255
           | fail "setRendererDrawColor"
         SDL2.renderClear renderer
         sequence_ (drawBoard board width height renderer)
-        drawPlayer pman board width height renderer
+        drawPlayer player board width height renderer
         SDL2.renderPresent renderer
-        loop renderer
+
+        {- NOTE FOR COLLISION DETECTION: don't check object positions. Check them modulo the board size. -}
+
+        {- Event handling and game logic-}
+        let mp = movePlayer board
+        event <- SDL2.pollEvent
+        case event of
+             Just (SDL2.KeyDown SDL2.KeyUpArrow) => do
+               loop (mapPlayer (mp Up) s) renderer
+
+             Just (SDL2.KeyDown SDL2.KeyDownArrow) => do
+               loop (mapPlayer (mp Down) s) renderer
+
+             Just (SDL2.KeyDown SDL2.KeyRightArrow) => do
+               loop (mapPlayer (mp Right) s) renderer
+
+             Just (SDL2.KeyDown SDL2.KeyLeftArrow) => do
+               loop (mapPlayer (mp Left) s) renderer
+             _ => do loop s renderer
