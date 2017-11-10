@@ -19,7 +19,7 @@ drawSquare m n bw bh ren (x,y,isWall) = let
   blockX : Nat = x * bw
   blockY : Nat = y * bh
 in do
-  drawRect (cast blockX) (cast blockY) (cast bw) (cast bh) (255*isWall) 0 0 ren
+  drawRect (cast blockX) (cast blockY) (cast bw) (cast bh) (10*isWall) 0 (255*isWall) ren
 
 
 drawBoard : SphereMat n m Int -> (w : Nat) -> (h : Nat) -> Renderer -> List (IO ())
@@ -78,7 +78,7 @@ drawPlayer (Play x y) m0 w h ren {n = n} {m = m} = let
                                                         cy : Nat = (y `mod` n)*bh + (bh `div` 2)
                                                         r : Nat = (min bw bh) `div` 2
                                                         in
-                                                        drawCircle cx cy r 0 255 0 ren
+                                                        drawCircle cx cy r 255 255 0 ren
 
 
 fail : (msg: String) -> IO ()
@@ -95,7 +95,7 @@ height : Nat
 height = 400
 
 pman : Player
-pman = Play 1 1
+pman = Play 10 10
 
 beginState : GameState
 beginState = State pman 0
