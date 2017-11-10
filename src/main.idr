@@ -1,4 +1,5 @@
 module Main
+import Board
 import Graphics.SDL2 as SDL2
 import System as System
 import Data.Vect as Vect
@@ -6,84 +7,6 @@ import Data.Matrix as Matrix
 import Data.Matrix.Numeric
 import Data.Fin
 import Debug.Trace
-
-
-{- Row vector -}
-data RingVect : (len : Nat) -> (t : Type) -> Type where
-  Nil : RingVect Z t
-  (::) : t -> RingVect n t -> RingVect (S n) t
-%name RingVect xs,ys,zs,ws
-
-rmap : (a -> b) -> RingVect n a -> RingVect n b
-rmap f [] = []
-rmap f (x :: xs) = (f x) :: (rmap f xs)
-
-Functor (RingVect n) where
-  map = rmap
-
-{- Precondition: n > 0 -}
-index : (x : Nat) -> RingVect n a -> a
-index x [y] = y
-index Z (y :: xs) {n = (S k)} = y
-index (S j) (y :: xs) {n = (S k)} = case ((S k) `isLTE` (S j)) of {- x >= n -}
-                                       Yes pf => index ((S j) - (S k)) (y :: xs)
-                                       No pf => index j xs
-
-{- n = rows -}
-{- m = cols -}
-SphereMat : Nat -> Nat -> Type -> Type
-SphereMat n m a = RingVect n (RingVect m a)
-%name SphereMat m0, m1
-
-getRow : SphereMat n m a -> Nat -> RingVect m a
-getRow m0 k= index k m0
-
-getCol : SphereMat n m a -> Nat -> RingVect n a
-getCol m0 k= map (index k) m0
-
-getEntry : SphereMat n m a -> Nat -> Nat -> a
-getEntry m0 k j = index j (getRow m0 k)
-
-{-The board is a sphere-}
-board : SphereMat 20 20 Int
-board = (1::1::1::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::[]) ::
-        (1::1::1::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::[]) ::
-        (0::0::1::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::[]) ::
-        (0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::[]) ::
-        (0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::[]) ::
-        (0::0::0::0::0::0::0::1::1::1::1::1::1::1::0::0::0::0::0::0::[]) ::
-        (0::0::0::0::0::0::0::1::0::0::0::0::0::1::0::0::0::0::0::0::[]) ::
-        (0::0::0::0::0::0::0::1::0::1::1::1::0::1::0::0::0::0::0::0::[]) ::
-        (0::0::0::0::0::0::0::1::0::1::1::1::0::1::0::0::0::0::0::0::[]) ::
-        (1::1::1::1::1::1::1::1::0::1::1::1::0::1::1::1::1::1::1::1::[]) ::
-        (0::0::0::1::0::0::0::1::0::0::1::0::0::1::0::0::1::0::0::0::[]) ::
-        (0::0::0::1::0::0::0::1::1::1::1::1::1::1::0::0::1::0::0::0::[]) ::
-        (0::0::0::1::0::0::0::0::0::0::1::0::0::0::0::0::1::0::0::0::[]) ::
-        (0::0::0::1::0::0::0::0::0::0::1::0::0::0::0::0::1::0::0::0::[]) ::
-        (0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::[]) ::
-        (0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::[]) ::
-        (0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::[]) ::
-        (0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::[]) ::
-        (0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::[]) ::
-        (0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::0::[]) :: []
-        {-
-        (1::1::1:: []) ::
-        (1::0::1:: []) ::
-        (0::1::1:: []) :: []
-        -}
-
-matToList : SphereMat n m a -> List (Nat,Nat,a)
-matToList m0 {n = Z} {m = Z} = []
-matToList m0 {n = Z} {m = (S k)} = []
-matToList m0 {n = (S k)} {m = Z} = []
-matToList m0 {n = (S k)} {m = (S j)} = [(x,y,e) |
-                    x <- [0..k],
-                    y <- [0..j],
-                    e <- [getEntry m0 x y]
-                  ]
-
-isTraversable : SphereMat a b Int -> Nat -> Nat -> Bool
-isTraversable m0 k j = getEntry m0 k j == 1
 
 drawCircle : (x : Nat) -> (y : Nat) -> (r : Nat) -> Int -> Int -> Int -> Renderer -> IO ()
 drawCircle x y rad r g b ren = SDL2.filledEllipse ren (cast x) (cast y) (cast rad) (cast rad) r g b 255
@@ -138,8 +61,8 @@ movePlayer m0 Down p@(Play x y) {w = w} {h = h} = if isTraversable m0 x (S y)
 movePlayer m0 Left p@(Play Z y) {w = w} {h = h} = if isTraversable m0 w y
                                                    then Play w y
                                                    else p
-movePlayer m0 Left p@(Play (S k) y) {w = w} {h = h} = if isTraversable m0 (S k) y
-                                                       then Play (S k) y
+movePlayer m0 Left p@(Play (S k) y) {w = w} {h = h} = if isTraversable m0 k y
+                                                       then Play k y
                                                        else p
 movePlayer m0 Right p@(Play x y) {w = w} {h = h} = if isTraversable m0 (S x) y
                                                       then Play (S x) y
@@ -172,7 +95,7 @@ height : Nat
 height = 400
 
 pman : Player
-pman = Play 0 0
+pman = Play 1 1
 
 beginState : GameState
 beginState = State pman 0
